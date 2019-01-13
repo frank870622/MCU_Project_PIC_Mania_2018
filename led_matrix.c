@@ -32,26 +32,39 @@
 #define CS LATDbits.LATD1
 #define CLK LATDbits.LATD2
 #define _XTAL_FREQ 8000000
+//inital to led matrix
 void init();
-void MAX7219_1Unit(char reg_addr, char reg_data);
+//send data to led matrix bit by bit
 void send_byte(char data);
+//send data to all the led matrix
 void MAX7219_AllUnit(char reg_addr, char reg_data);
+//send date to a led matrix
 void MAX7219_indexUnit(int unit_index, int reg_addr, int reg_data);
+//function for draw song map
 void shift_Draw();
+//function for draw score after game
 void score_Draw();
+//initial interrupt
 void interrupt_init();
+//get the current line of map for checking hit or miss
 const unsigned char getCurrentLine();
 
+//number of LED matrix 
 int MAX7219_units = 4;
-int string_len = 48;
-int game_over = 5000;
+//flag of game over
+int game_over = 1;
+//score
 int score = 0;
-unsigned int score0 = 0, score1 = 0, score2 = 0, scoreB = 0;
+//flag of hit of miss
 int hit_check = 0;
+//the head of song map
 unsigned char* matrixData_map_head;
+//the next line data will show at LED matrix
 unsigned int matrixData_map_empty_front = 8 * 3 + 1;
+//the end of song map
 unsigned char* matrixData_map_end = NULL;
 
+//image of hit of miss
 char matrixData_hit[24] = {
     //space
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -61,6 +74,7 @@ char matrixData_hit[24] = {
     0x00, 0x41, 0x41, 0x49, 0x55, 0x63, 0x41, 0x00
 };
 
+//image of number for score 
 char matrixData_num[80] = {
     //0
     0x3C, 0x42, 0x42, 0x42, 0x42, 0x42, 0x3C, 0x00,
@@ -84,7 +98,7 @@ char matrixData_num[80] = {
     0x18, 0x20, 0x40, 0x78, 0x44, 0x44, 0x38, 0x00
 };
 
-
+//song map
 unsigned char matrixData_map[] = {
     0x03, 0x03, 0x0c, 0x0c, 0x30, 0x30, 0xc0, 0xc0, 0xc0, 0xc0, 0x00, 0x00,
     0x30, 0x30, 0x0c, 0x0c, 0x03, 0x03, 0x00, 0x00, 0xc0, 0xc0, 0x00, 0x00,
@@ -152,59 +166,59 @@ unsigned char matrixData_map[] = {
 };
 
 void __interrupt(high_priority) HI_ISR() {
+    //interrupt for button 0
     if (INTCONbits.INT0IF) {
-        __delay_us(900);
+        //__delay_us(900);
         if (!PORTBbits.RB0) {
             if (getCurrentLine() & 0b00000011) {
                 ++score;
-                ++score0;
                 hit_check = 5;
             } else {
-                if(score)
+                if (score)
                     score -= 1;
                 hit_check = 10;
             }
         }
         INTCONbits.INT0IF = 0;
     }
+    //interrupt for button 1
     if (INTCON3bits.INT1IF) {
-        __delay_us(900);
+        //__delay_us(900);
         if (!PORTBbits.RB1) {
             if (getCurrentLine() & 0b00001100) {
                 ++score;
-                ++score1;
                 hit_check = 5;
             } else {
-                if(score)
+                if (score)
                     score -= 1;
                 hit_check = 10;
             }
         }
         INTCON3bits.INT1IF = 0;
     }
+    //interrupt for button 2
     if (INTCON3bits.INT2IF) {
-        __delay_us(900);
+        //__delay_us(900);
         if (!PORTBbits.RB2) {
             if (getCurrentLine() & 0b00110000) {
                 ++score;
-                ++score2;
                 hit_check = 5;
             } else {
-                if(score)
+                if (score)
                     score -= 1;
                 hit_check = 10;
             }
         }
         INTCON3bits.INT2IF = 0;
     }
+    //interrupt for button 3
     if (INTCONbits.RBIE && INTCONbits.RBIF) {
         if (!PORTBbits.RB4) {
             if (getCurrentLine() & 0b11000000) {
                 ++score;
-                ++scoreB;
                 hit_check = 5;
             } else {
-                if(score)
+                if (score)
                     score -= 1;
                 hit_check = 10;
             }
@@ -219,19 +233,16 @@ void main(void) {
     OSCCONbits.IRCF = 7;
     LATD = 0x00;
     interrupt_init();
-    //while (1);
     init();
+    //wait for start button
     while (PORTDbits.RD3 == 1);
     hit_check = 0;
     while (1) {
         if (game_over > 0) {
-            --game_over;
             shift_Draw();
         } else score_Draw();
         __delay_ms(35);
-        //delay();
     }
-
     return;
 }
 
@@ -267,19 +278,21 @@ void init() {
     matrixData_map_end = matrixData_map + sizeof (matrixData_map);
     CS = 1;
     CLK = 1;
-    MAX7219_AllUnit(0x0b, 0x07);
+    MAX7219_AllUnit(0x0b, 0x07);    //send initial data to max7219
     MAX7219_AllUnit(0x09, 0x00);
     MAX7219_AllUnit(0x0c, 0x01);
     MAX7219_AllUnit(0x0f, 0x00);
 
-    for (int i = 1; i <= 8; i++) {// ???? LED ????
+    for (int i = 1; i <= 8; i++) {// reset all  LED 
         MAX7219_AllUnit(i, 0);
     }
-    MAX7219_AllUnit(0x0a, 0x00);
+    MAX7219_AllUnit(0x0a, 0x00);    //set led bright
     __delay_ms(1000);
     //delay();
 }
-
+//for led matrix , one package is 16 bit 
+//first we send 8 bit address bit or command bit
+//and then we send 8 bit data & 
 void send_byte(char data) {
     int i = 8;
     int mask;
@@ -296,58 +309,35 @@ void send_byte(char data) {
     }
 }
 
-void MAX7219_1Unit(char reg_addr, char reg_data) {
-    CS = 0;
-    send_byte(reg_addr);
-    send_byte(reg_data);
-    CS = 1;
-}
-
-void MAX7219_AllUnit(char reg_addr, char reg_data) {// ??????? MAX7219 ?????????
-    CS = 0; // ??? LOAD ????? LOW
+void MAX7219_AllUnit(char reg_addr, char reg_data) {// all  MAX7219 datasend
+    CS = 0; // set CS to  LOW
     for (int c = 1; c <= MAX7219_units; c++) {
-        send_byte(reg_addr); // ????????????
-        send_byte(reg_data); // ??????
+        send_byte(reg_addr); // send address to led  matrix
+        send_byte(reg_data); // send data to led matrix
     }
-    CS = 1; // ??? LOAD ???? HIGH
+    CS = 1; // set CS to HIGH
 }
 
-void MAX7219_indexUnit(int unit_index, int reg_addr, int reg_data) {// ??????????? MAX7219 ???????????
+void MAX7219_indexUnit(int unit_index, int reg_addr, int reg_data) {// control of one of all MAX7219
     int c = 0;
-    CS = 0; // ??? LOAD ?????LOW
-    // ?????????????
+    CS = 0; // set CS to LOW
+    // control from last led matrix
     for (c = MAX7219_units; c > unit_index; c--) {
-        send_byte(0); // NO-OP ???
-        send_byte(0); // ?? = 0
+        send_byte(0); // NO-OP register
+        send_byte(0); // data = 0
     }
 
-    send_byte(reg_addr); // ????????????
-    send_byte(reg_data); // ??????
+    send_byte(reg_addr); // send register address
+    send_byte(reg_data); // send data
 
     for (c = unit_index - 1; c >= 1; c--) {
-        send_byte(0); // NO-OP ???
-        send_byte(0); // ?? = 0
+        send_byte(0); // NO-OP register
+        send_byte(0); // data = 0
     }
-    CS = 1; // ??? LOAD ???? HIGH
+    CS = 1; // set CS to HIGH
 }
 
 void shift_Draw() {
-    /*
-        for (int j = 1; j <= 4; ++j) {
-            for (int i = 1; i <= 8; ++i) {
-                MAX7219_indexUnit(j, i, matrixData_song[(now_head + i + 8 * j - 2) % string_len]);
-            }
-        }
-     * */
-    /*
-    for (int j = 2; j <= 4; ++j) {
-        for (int i = 1; i <= 8; ++i) {
-            MAX7219_indexUnit(j, i, matrixData_70[(now_head + i + 8 * (j - 2) - 1) % string_len]);
-        }
-    }
-     * */
-
-    //if(matrixData_map_head >= matrixData_map_end) {// no extra empty frame
     if (matrixData_map_head > matrixData_map_end) {// will leave an empty frame
         game_over = 0;
         matrixData_map_head = matrixData_map;
@@ -358,7 +348,7 @@ void shift_Draw() {
         --matrixData_map_empty_front;
     else
         matrixData_map_head += 1; // this time: start from next byte
-
+    //draw the map line for 3 led matrix
     if (matrixData_map_head <= matrixData_map_end) {
         unsigned char* matrixData_map_cur = matrixData_map_head;
         int j = 2;
@@ -377,16 +367,16 @@ void shift_Draw() {
             }
         }
     }
-
-    if (hit_check & 2) {
+// check hit or miss
+    if (hit_check & 2) {//miss
         for (int i = 1; i <= 8; ++i) {
             MAX7219_indexUnit(1, i, matrixData_hit[i - 1 + 16]);
         }
-    } else if (hit_check & 1) {
+    } else if (hit_check & 1) {//hit
         for (int i = 1; i <= 8; ++i) {
             MAX7219_indexUnit(1, i, matrixData_hit[i - 1 + 8]);
         }
-    } else {
+    } else {//space
         for (int i = 1; i <= 8; ++i) {
             MAX7219_indexUnit(1, i, matrixData_hit[i - 1]);
         }
@@ -394,7 +384,7 @@ void shift_Draw() {
 
     hit_check >>= 2;
 }
-
+//draw score after game
 void score_Draw() {
     int thousand = (score / 1000) % 10;
     int hundred = (score % 1000) / 100;
@@ -407,7 +397,7 @@ void score_Draw() {
         MAX7219_indexUnit(1, i, matrixData_num[8 * digit + i - 1]);
     }
 }
-
+//get the current line of map
 const unsigned char getCurrentLine() {
     if (matrixData_map_empty_front || matrixData_map_head >= matrixData_map_end)
         return 0;
