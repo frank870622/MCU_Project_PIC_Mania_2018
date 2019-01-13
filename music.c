@@ -81,7 +81,7 @@ void __interrupt() tc_int(void)
             T3CONbits.TMR3ON = 0;
         }    
         
-        TMR2 = 20;
+        TMR2 = 30;
         PIR1bits.TMR2IF = 0;
     }
 }
@@ -135,7 +135,7 @@ void main(void) {
     TMR0 = sine_one_tone[sine_one_index];
     TMR1 = sine_two_tone[sine_two_index];
     TMR3 = sine_three_tone[sine_three_index];
-    TMR2 = 20;
+    TMR2 = 30;
     sine_one_length = sizeof(sine_one_tone)/sizeof(int);
     sine_two_length = sizeof(sine_two_tone)/sizeof(int);
     sine_three_length = sizeof(sine_three_tone)/sizeof(int);
